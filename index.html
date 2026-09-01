@@ -7,8 +7,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="お宝カード査定">
-<link rel="manifest" href="manifest.webmanifest?v=86">
-<link rel="apple-touch-icon" href="icons/icon-180.png?v=86">
+<link rel="manifest" href="manifest.webmanifest?v=87">
+<link rel="apple-touch-icon" href="icons/icon-180.png?v=87">
 <title>お宝カード査定</title>
 <style>
 :root{--gold:#efb93e;--bg:#090909;--panel:#15171a;--muted:#b9b7b0;--accent:#efb93e}
@@ -139,12 +139,12 @@ input[type=file]{display:none}input[type=search]{width:100%;min-height:50px;bord
 
 <script type="module">
 const GAMES=[
- {id:'onepiece',name:'ONE PIECEカード',asset:'/assets/onepiece.jpg?v=86',accent:'#efb93e'},
- {id:'pokemon',name:'ポケモンカード',asset:'/assets/pokemon.jpg?v=86',accent:'#ffd849'},
- {id:'dragonball',name:'ドラゴンボールカード',asset:'/assets/dragonball.jpg?v=86',accent:'#ff8b24'},
- {id:'yugioh',name:'遊戯王OCG',asset:'/assets/yugioh.jpg?v=86',accent:'#b96cf0'},
- {id:'duelmasters',name:'デュエル・マスターズ',asset:'/assets/duelmasters.jpg?v=86',accent:'#ff9b29'},
- {id:'weiss',name:'ヴァイスシュヴァルツ',asset:'/assets/weiss.jpg?v=86',accent:'#f39ac7'}
+ {id:'onepiece',name:'ONE PIECEカード',asset:'/assets/onepiece.jpg?v=87',accent:'#efb93e'},
+ {id:'pokemon',name:'ポケモンカード',asset:'/assets/pokemon.jpg?v=87',accent:'#ffd849'},
+ {id:'dragonball',name:'ドラゴンボールカード',asset:'/assets/dragonball.jpg?v=87',accent:'#ff8b24'},
+ {id:'yugioh',name:'遊戯王OCG',asset:'/assets/yugioh.jpg?v=87',accent:'#b96cf0'},
+ {id:'duelmasters',name:'デュエル・マスターズ',asset:'/assets/duelmasters.jpg?v=87',accent:'#ff9b29'},
+ {id:'weiss',name:'ヴァイスシュヴァルツ',asset:'/assets/weiss.jpg?v=87',accent:'#f39ac7'}
 ];
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const yen=n=>new Intl.NumberFormat('ja-JP',{style:'currency',currency:'JPY',maximumFractionDigits:0}).format(Number(n)||0);
@@ -188,63 +188,125 @@ function ocrCrop(src,rx,ry,rw,rh,scale=2,mode='normal'){
  return c;
 }
 
-async function ocrText(t,canvas){
+async function ocrText(t,canvas,lang='eng'){
  try{
-   const r=await t.recognize(canvas,'eng');
+   const r=await t.recognize(canvas,lang);
    return r?.data?.text||'';
  }catch(_){return ''}
+}
+
+function normalizeOcr(txt){
+ return String(txt||'').toUpperCase()
+   .replace(/[—–−ー―_]/g,'-')
+   .replace(/[｜|]/g,'I')
+   .replace(/[‐‑‒]/g,'-');
+}
+
+function extractCode(txt){
+ const raw=normalizeOcr(txt);
+ const compact=raw.replace(/\s+/g,'').replace(/[.,:;·•]/g,'');
+ const variants=[compact,
+   compact.replace(/O(?=\d)/g,'0').replace(/(?<=\d)O/g,'0').replace(/I(?=\d)/g,'1').replace(/(?<=\d)I/g,'1')
+ ];
+ const pats=[
+   /PRB[0-9IOI]{2}-?[0-9IO]{3}/,
+   /(?:OP|EB|ST|FB)[0-9IOI]{2}-?[0-9IO]{3}/,
+   /P-?[0-9IO]{3}/,
+   /(?:OP|EB|ST|FB)[0-9]{5}/,
+   /SV[A-Z0-9\/-]{3,}/,
+   /\d{3}\/\d{3}/,
+   /QCC[A-Z0-9-]+/
+ ];
+ for(const u of variants){
+   for(const p of pats){
+     const m=u.match(p); if(!m)continue;
+     let v=m[0].replace(/I/g,'1').replace(/O/g,'0');
+     if(/^PRB\d{5}$/.test(v))v=v.slice(0,5)+'-'+v.slice(5);
+     if(/^(OP|EB|ST|FB)\d{5}$/.test(v))v=v.slice(0,4)+'-'+v.slice(4);
+     if(/^P\d{3}$/.test(v))v='P-'+v.slice(1);
+     return v;
+   }
+ }
+ // Prefix itself was misread: recover common ONE PIECE formats from nearby OCR.
+ const fuzzy=compact.match(/(?:0P|QP|DP|0B|5T|E8|EB|ST|OP)[0-9IOI]{2}-?[0-9IO]{3}/);
+ if(fuzzy){
+   let v=fuzzy[0].replace(/^0P|^QP|^DP/,'OP').replace(/^5T/,'ST').replace(/^E8/,'EB')
+     .replace(/I/g,'1').replace(/O/g,'0');
+   if(!v.includes('-'))v=v.slice(0,4)+'-'+v.slice(4);
+   return v;
+ }
+ return '';
+}
+
+function nameCandidates(txt){
+ const lines=String(txt||'').split(/\n+/).map(x=>x.trim()).filter(Boolean);
+ const scored=[];
+ for(let line of lines){
+   line=line.replace(/[|¦]/g,'').replace(/\s{2,}/g,' ').trim();
+   if(line.length<2||line.length>28)continue;
+   if(extractCode(line))continue;
+   if(/^[\d\W_]+$/.test(line))continue;
+   const jp=(line.match(/[ぁ-んァ-ヶ一-龠々ー]/g)||[]).length;
+   const latin=(line.match(/[A-Za-z]/g)||[]).length;
+   if(jp<2 && latin<3)continue;
+   const noise=(line.match(/[{}<>_=~^]/g)||[]).length;
+   const score=jp*3+latin-noise*4-Math.abs(line.length-8)*.15;
+   scored.push([score,line]);
+ }
+ return [...new Map(scored.sort((a,b)=>b[0]-a[0]).map(x=>[x[1],1])).keys()].slice(0,6);
 }
 
 async function recognize(file){
  const stat=await imgStats(file);let warning='';
  if(stat.lum<45)warning='写真がかなり暗めです。ライトを当てるとさらに精度が上がります。';
  else if(stat.edge<10)warning='写真がかなりぼけている可能性があります。';
-
  const t=await loadOCR();
+ // ONE PIECEのカード番号は下部に小さく印刷されるため、全体＋細い下端帯を重点的に読む。
  const passes=[
    stat.canvas,
-   ocrCrop(stat.canvas,0,.62,1,.38,3,'contrast'),
-   ocrCrop(stat.canvas,.42,.52,.58,.48,3,'contrast'),
-   ocrCrop(stat.canvas,0,.68,1,.32,3,'threshold'),
-   ocrCrop(stat.canvas,.48,.58,.52,.42,4,'threshold')
+   ocrCrop(stat.canvas,0,.54,1,.46,3,'contrast'),
+   ocrCrop(stat.canvas,0,.66,1,.34,4,'contrast'),
+   ocrCrop(stat.canvas,0,.72,1,.16,5,'contrast'),
+   ocrCrop(stat.canvas,0,.80,1,.18,5,'contrast'),
+   ocrCrop(stat.canvas,.36,.62,.64,.34,5,'contrast'),
+   ocrCrop(stat.canvas,.50,.70,.50,.25,6,'contrast'),
+   ocrCrop(stat.canvas,0,.72,1,.18,5,'threshold'),
+   ocrCrop(stat.canvas,.45,.66,.55,.30,6,'threshold')
  ];
  let combined='';
  for(const c of passes){
-   const tx=await ocrText(t,c);
+   const tx=await ocrText(t,c,'eng');
    combined+='\n'+tx;
    const code=extractCode(combined);
-   if(code)return {text:combined,code,warning};
+   if(code)return {text:combined,code,warning,nameText:'',names:[]};
  }
- return {text:combined,code:'',warning:warning||'カード番号を自動認識できませんでした。番号部分だけを追加撮影すると精度が上がります。'};
+ // 番号が取れない時だけ日本語も含めてカード名候補を読む。追加撮影なしのフォールバック。
+ let nameText='';
+ try{
+   const namePasses=[
+     ocrCrop(stat.canvas,.04,.05,.92,.55,2,'contrast'),
+     ocrCrop(stat.canvas,.02,.42,.96,.46,2,'contrast'),
+     stat.canvas
+   ];
+   for(const c of namePasses) nameText+='\n'+await ocrText(t,c,'jpn+eng');
+ }catch(_){ }
+ const names=nameCandidates(nameText);
+ return {text:combined,code:'',warning,names,nameText};
 }
 
-function extractCode(txt){
- let u=String(txt).toUpperCase()
-   .replace(/[—–−ー―]/g,'-')
-   .replace(/[｜|]/g,'I')
-   .replace(/\s+/g,'')
-   .replace(/O(?=\d)/g,'0')
-   .replace(/(?<=\d)O/g,'0');
-
- const candidates=[
-   /OP[0-9I]{2}-[0-9IO]{3}/,
-   /EB[0-9I]{2}-[0-9IO]{3}/,
-   /ST[0-9I]{2}-[0-9IO]{3}/,
-   /FB[0-9I]{2}-[0-9IO]{3}/,
-   /(?:OP|EB|ST|FB)[0-9]{5}/,
-   /SV[A-Z0-9\/-]{3,}/,
-   /\d{3}\/\d{3}/,
-   /QCC[A-Z0-9-]+/
- ];
- for(const p of candidates){
-   const m=u.match(p);
-   if(m){
-     let v=m[0].replace(/I/g,'1').replace(/O/g,'0');
-     if(/^(OP|EB|ST|FB)\d{5}$/.test(v))v=v.slice(0,4)+'-'+v.slice(4);
-     return v;
-   }
+async function identifyByNames(names){
+ const seen=new Map();
+ for(const q of names.slice(0,5)){
+   try{
+     const d=await lookup(q);
+     for(const c of (d.cards||[])){
+       const k=(c.code||'')+'|'+(c.variant||'')+'|'+(c.name||'');
+       if(!seen.has(k))seen.set(k,c);
+     }
+     if(seen.size===1)return {card:[...seen.values()][0],query:q};
+   }catch(_){ }
  }
- return '';
+ return {card:null,candidates:[...seen.values()]};
 }
 async function lookup(q){const r=await fetch('/.netlify/functions/search-card?game='+encodeURIComponent(currentGame)+'&q='+encodeURIComponent(q));const d=await r.json();if(!r.ok)throw new Error(d.error||'検索エラー');return d}
 function mquery(c){return [c.name,c.code,c.variant].filter(Boolean).join(' ')}
@@ -389,12 +451,26 @@ currentSubscription().then(s=>{if(s)$('#pushStatus').textContent='✅ この端�
 $('#scan').onclick=async()=>{
  $('#scan').disabled=true;
  for(let i=0;i<files.length;i++){const st=$('#st-'+i),rs=$('#rs-'+i);try{
-  st.textContent='カード番号を複数範囲で読取中…';const {text,code:recognizedCode,warning}=await recognize(files[i]);const code=recognizedCode||extractCode(text);
-  if(!code){st.textContent='追加撮影をおすすめします';st.className='status warn';rs.innerHTML=`<div class="notice">${warning||'カード番号を自動認識できませんでした。カード全体はそのままで、番号部分だけを追加撮影すると精度が上がります。'}</div>`;continue}
-  st.textContent='相場検索中：'+code;const d=await lookup(code);
-  if(d.cards?.length===1){const alerts=checkTrackedPrice(d.cards[0]);st.textContent='査定完了';st.className='status ok';rs.innerHTML=(warning?`<div class="notice">${warning}</div>`:'')+(alerts.length?alerts.map(a=>`<div class="trackAlert">${a}</div>`).join(''):'')+resultHtml(d.cards[0])}
-  else if(d.cards?.length>1){st.textContent='複数種類があります';st.className='status warn';rs.innerHTML='<div class="notice">通常版・パラレル等の候補があります。該当する種類を選んでください。</div>'+d.cards.map(resultHtml).join('')}
-  else{st.textContent='カード番号は認識できました';st.className='status warn';const mq=code;rs.innerHTML=`<div class="notice">国内価格データ未登録です。現在出品は検索できます。</div><div class="market"><button onclick="marketOpen('yahoo','${mq}')">ヤフオク</button><button onclick="marketOpen('yclosed','${mq}')">落札相場</button><button onclick="marketOpen('mercari','${mq}')">メルカリ</button><button onclick="marketOpen('flea','${mq}')">Yahoo!フリマ</button></div>`}
+  st.textContent='カード全体＋番号を自動読取中…';
+  const rec=await recognize(files[i]);const code=rec.code||extractCode(rec.text);
+  if(code){
+   st.textContent='相場検索中：'+code;const d=await lookup(code);
+   if(d.cards?.length===1){const alerts=checkTrackedPrice(d.cards[0]);st.textContent='査定完了';st.className='status ok';rs.innerHTML=(rec.warning?`<div class="notice">${rec.warning}</div>`:'')+(alerts.length?alerts.map(a=>`<div class="trackAlert">${a}</div>`).join(''):'')+resultHtml(d.cards[0])}
+   else if(d.cards?.length>1){st.textContent='複数種類があります';st.className='status warn';rs.innerHTML='<div class="notice">通常版・パラレル等の候補があります。該当する種類を選んでください。</div>'+d.cards.map(resultHtml).join('')}
+   else{st.textContent='カード番号は認識できました';st.className='status warn';const mq=code;rs.innerHTML=`<div class="notice">カード番号：${code}。国内価格データ未登録の場合でも出品検索できます。</div><div class="market"><button onclick="marketOpen('yahoo','${mq}')">ヤフオク</button><button onclick="marketOpen('yclosed','${mq}')">落札相場</button><button onclick="marketOpen('mercari','${mq}')">メルカリ</button><button onclick="marketOpen('flea','${mq}')">Yahoo!フリマ</button></div>`}
+  }else{
+   st.textContent='カード名候補も照合中…';
+   const byName=await identifyByNames(rec.names||[]);
+   if(byName.card){
+     const c=byName.card,alerts=checkTrackedPrice(c);st.textContent='カード名から査定完了';st.className='status ok';
+     rs.innerHTML=`<div class="notice">カード番号が小さく読めなかったため「${byName.query}」を手掛かりに自動照合しました。</div>`+(alerts.length?alerts.map(a=>`<div class="trackAlert">${a}</div>`).join(''):'')+resultHtml(c);
+   }else{
+     st.textContent='自動特定できませんでした';st.className='status warn';
+     const names=(rec.names||[]).slice(0,3);
+     const hint=names.length?`読み取れた候補：${names.join(' / ')}`:'カード名・番号とも十分な文字を読み取れませんでした。';
+     rs.innerHTML=`<div class="notice">${rec.warning?rec.warning+'<br>':''}${hint}<br>写真はそのままで、下の検索欄にカード名の一部を入力すると検索できます。</div>`;
+   }
+  }
  }catch(e){st.textContent='エラー';st.className='status warn';rs.innerHTML='<div class="notice">'+String(e.message||e)+'</div>'}}
  $('#scan').disabled=false;
 };
