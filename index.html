@@ -7,8 +7,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="お宝カード査定">
-<link rel="manifest" href="manifest.webmanifest?v=85">
-<link rel="apple-touch-icon" href="icons/icon-180.png?v=85">
+<link rel="manifest" href="manifest.webmanifest?v=86">
+<link rel="apple-touch-icon" href="icons/icon-180.png?v=86">
 <title>お宝カード査定</title>
 <style>
 :root{--gold:#efb93e;--bg:#090909;--panel:#15171a;--muted:#b9b7b0;--accent:#efb93e}
@@ -139,12 +139,12 @@ input[type=file]{display:none}input[type=search]{width:100%;min-height:50px;bord
 
 <script type="module">
 const GAMES=[
- {id:'onepiece',name:'ONE PIECEカード',asset:'/assets/onepiece.jpg?v=85',accent:'#efb93e'},
- {id:'pokemon',name:'ポケモンカード',asset:'/assets/pokemon.jpg?v=85',accent:'#ffd849'},
- {id:'dragonball',name:'ドラゴンボールカード',asset:'/assets/dragonball.jpg?v=85',accent:'#ff8b24'},
- {id:'yugioh',name:'遊戯王OCG',asset:'/assets/yugioh.jpg?v=85',accent:'#b96cf0'},
- {id:'duelmasters',name:'デュエル・マスターズ',asset:'/assets/duelmasters.jpg?v=85',accent:'#ff9b29'},
- {id:'weiss',name:'ヴァイスシュヴァルツ',asset:'/assets/weiss.jpg?v=85',accent:'#f39ac7'}
+ {id:'onepiece',name:'ONE PIECEカード',asset:'/assets/onepiece.jpg?v=86',accent:'#efb93e'},
+ {id:'pokemon',name:'ポケモンカード',asset:'/assets/pokemon.jpg?v=86',accent:'#ffd849'},
+ {id:'dragonball',name:'ドラゴンボールカード',asset:'/assets/dragonball.jpg?v=86',accent:'#ff8b24'},
+ {id:'yugioh',name:'遊戯王OCG',asset:'/assets/yugioh.jpg?v=86',accent:'#b96cf0'},
+ {id:'duelmasters',name:'デュエル・マスターズ',asset:'/assets/duelmasters.jpg?v=86',accent:'#ff9b29'},
+ {id:'weiss',name:'ヴァイスシュヴァルツ',asset:'/assets/weiss.jpg?v=86',accent:'#f39ac7'}
 ];
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const yen=n=>new Intl.NumberFormat('ja-JP',{style:'currency',currency:'JPY',maximumFractionDigits:0}).format(Number(n)||0);
@@ -163,24 +163,88 @@ $('#camera').onchange=()=>$('#camera').files&&setFiles($('#camera').files);$('#l
 function renderQueue(){const q=$('#queue');q.innerHTML='';files.forEach((f,i)=>{const u=URL.createObjectURL(f);urls.push(u);q.insertAdjacentHTML('beforeend',`<div class="item"><img class="thumb" src="${u}"><div><div class="name">写真 ${i+1}</div><div id="st-${i}" class="status">待機中</div><div id="rs-${i}"></div></div></div>`)});$('#scan').disabled=!files.length}
 
 async function imgStats(file){
- const bmp=await createImageBitmap(file),c=document.createElement('canvas'),max=700,s=Math.min(1,max/bmp.width);c.width=Math.round(bmp.width*s);c.height=Math.round(bmp.height*s);const x=c.getContext('2d');x.drawImage(bmp,0,0,c.width,c.height);bmp.close?.();
+ const bmp=await createImageBitmap(file),c=document.createElement('canvas'),max=1200,s=Math.min(1,max/bmp.width);c.width=Math.round(bmp.width*s);c.height=Math.round(bmp.height*s);const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(bmp,0,0,c.width,c.height);bmp.close?.();
  const d=x.getImageData(0,0,c.width,c.height).data;let lum=0;for(let i=0;i<d.length;i+=16)lum+=(d[i]*.299+d[i+1]*.587+d[i+2]*.114);lum/=Math.max(1,d.length/16);
- // edge proxy for blur
- let edge=0, cnt=0; const gray=(x,y)=>{const i=(y*c.width+x)*4;return d[i]*.299+d[i+1]*.587+d[i+2]*.114};
- for(let y=2;y<c.height-2;y+=6)for(let x0=2;x0<c.width-2;x0+=6){edge+=Math.abs(gray(x0+1,y)-gray(x0-1,y))+Math.abs(gray(x0,y+1)-gray(x0,y-1));cnt++}
+ let edge=0,cnt=0;const gray=(xx,yy)=>{const i=(yy*c.width+xx)*4;return d[i]*.299+d[i+1]*.587+d[i+2]*.114};
+ for(let yy=2;yy<c.height-2;yy+=6)for(let xx=2;xx<c.width-2;xx+=6){edge+=Math.abs(gray(xx+1,yy)-gray(xx-1,yy))+Math.abs(gray(xx,yy+1)-gray(xx,yy-1));cnt++}
  return {lum,edge:edge/Math.max(1,cnt),canvas:c};
 }
 async function loadOCR(){if(OCR)return OCR;OCR=await import('https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/+esm');return OCR}
+
+function ocrCrop(src,rx,ry,rw,rh,scale=2,mode='normal'){
+ const sx=Math.max(0,Math.floor(src.width*rx)),sy=Math.max(0,Math.floor(src.height*ry));
+ const sw=Math.max(1,Math.floor(src.width*rw)),sh=Math.max(1,Math.floor(src.height*rh));
+ const c=document.createElement('canvas');c.width=Math.min(2200,sw*scale);c.height=Math.min(1400,sh*scale);
+ const x=c.getContext('2d',{willReadFrequently:true});x.imageSmoothingEnabled=true;x.drawImage(src,sx,sy,sw,sh,0,0,c.width,c.height);
+ if(mode!=='normal'){
+   const im=x.getImageData(0,0,c.width,c.height),d=im.data;
+   for(let i=0;i<d.length;i+=4){
+     const g=d[i]*.299+d[i+1]*.587+d[i+2]*.114;
+     let v=mode==='threshold'?(g>150?255:0):Math.max(0,Math.min(255,(g-128)*1.8+128));
+     d[i]=d[i+1]=d[i+2]=v;
+   }
+   x.putImageData(im,0,0);
+ }
+ return c;
+}
+
+async function ocrText(t,canvas){
+ try{
+   const r=await t.recognize(canvas,'eng');
+   return r?.data?.text||'';
+ }catch(_){return ''}
+}
+
 async function recognize(file){
  const stat=await imgStats(file);let warning='';
- if(stat.lum<55)warning='写真が暗めです。ライトを当てて撮ると判定精度が上がります。';
- if(stat.edge<18)warning='写真がぼけている可能性があります。カードを固定して近づいて撮影してください。';
- const t=await loadOCR();const r=await t.recognize(stat.canvas,'eng').catch(()=>({data:{text:''}}));return {text:r.data.text||'',warning}
+ if(stat.lum<45)warning='写真がかなり暗めです。ライトを当てるとさらに精度が上がります。';
+ else if(stat.edge<10)warning='写真がかなりぼけている可能性があります。';
+
+ const t=await loadOCR();
+ const passes=[
+   stat.canvas,
+   ocrCrop(stat.canvas,0,.62,1,.38,3,'contrast'),
+   ocrCrop(stat.canvas,.42,.52,.58,.48,3,'contrast'),
+   ocrCrop(stat.canvas,0,.68,1,.32,3,'threshold'),
+   ocrCrop(stat.canvas,.48,.58,.52,.42,4,'threshold')
+ ];
+ let combined='';
+ for(const c of passes){
+   const tx=await ocrText(t,c);
+   combined+='\n'+tx;
+   const code=extractCode(combined);
+   if(code)return {text:combined,code,warning};
+ }
+ return {text:combined,code:'',warning:warning||'カード番号を自動認識できませんでした。番号部分だけを追加撮影すると精度が上がります。'};
 }
+
 function extractCode(txt){
- const u=String(txt).toUpperCase().replace(/\s/g,'').replace(/[—–−]/g,'-');
- const ps=[/(?:OP|EB|ST)\d{2}-\d{3}/,/FB\d{2}-\d{3}/,/SV[A-Z0-9\/-]{3,}/,/\d{3}\/\d{3}/,/QCC[A-Z0-9-]+/];
- for(const p of ps){const m=u.match(p);if(m)return m[0]}return '';
+ let u=String(txt).toUpperCase()
+   .replace(/[—–−ー―]/g,'-')
+   .replace(/[｜|]/g,'I')
+   .replace(/\s+/g,'')
+   .replace(/O(?=\d)/g,'0')
+   .replace(/(?<=\d)O/g,'0');
+
+ const candidates=[
+   /OP[0-9I]{2}-[0-9IO]{3}/,
+   /EB[0-9I]{2}-[0-9IO]{3}/,
+   /ST[0-9I]{2}-[0-9IO]{3}/,
+   /FB[0-9I]{2}-[0-9IO]{3}/,
+   /(?:OP|EB|ST|FB)[0-9]{5}/,
+   /SV[A-Z0-9\/-]{3,}/,
+   /\d{3}\/\d{3}/,
+   /QCC[A-Z0-9-]+/
+ ];
+ for(const p of candidates){
+   const m=u.match(p);
+   if(m){
+     let v=m[0].replace(/I/g,'1').replace(/O/g,'0');
+     if(/^(OP|EB|ST|FB)\d{5}$/.test(v))v=v.slice(0,4)+'-'+v.slice(4);
+     return v;
+   }
+ }
+ return '';
 }
 async function lookup(q){const r=await fetch('/.netlify/functions/search-card?game='+encodeURIComponent(currentGame)+'&q='+encodeURIComponent(q));const d=await r.json();if(!r.ok)throw new Error(d.error||'検索エラー');return d}
 function mquery(c){return [c.name,c.code,c.variant].filter(Boolean).join(' ')}
@@ -325,8 +389,8 @@ currentSubscription().then(s=>{if(s)$('#pushStatus').textContent='✅ この端�
 $('#scan').onclick=async()=>{
  $('#scan').disabled=true;
  for(let i=0;i<files.length;i++){const st=$('#st-'+i),rs=$('#rs-'+i);try{
-  st.textContent='画像品質を確認中…';const {text,warning}=await recognize(files[i]);const code=extractCode(text);
-  if(!code){st.textContent='追加撮影をおすすめします';st.className='status warn';rs.innerHTML=`<div class="notice">${warning||'カード番号が読めません。右下の番号部分を近くで、カード全体を正面から撮影してください。'}</div>`;continue}
+  st.textContent='カード番号を複数範囲で読取中…';const {text,code:recognizedCode,warning}=await recognize(files[i]);const code=recognizedCode||extractCode(text);
+  if(!code){st.textContent='追加撮影をおすすめします';st.className='status warn';rs.innerHTML=`<div class="notice">${warning||'カード番号を自動認識できませんでした。カード全体はそのままで、番号部分だけを追加撮影すると精度が上がります。'}</div>`;continue}
   st.textContent='相場検索中：'+code;const d=await lookup(code);
   if(d.cards?.length===1){const alerts=checkTrackedPrice(d.cards[0]);st.textContent='査定完了';st.className='status ok';rs.innerHTML=(warning?`<div class="notice">${warning}</div>`:'')+(alerts.length?alerts.map(a=>`<div class="trackAlert">${a}</div>`).join(''):'')+resultHtml(d.cards[0])}
   else if(d.cards?.length>1){st.textContent='複数種類があります';st.className='status warn';rs.innerHTML='<div class="notice">通常版・パラレル等の候補があります。該当する種類を選んでください。</div>'+d.cards.map(resultHtml).join('')}
