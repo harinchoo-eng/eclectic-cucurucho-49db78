@@ -162,8 +162,9 @@ function setFiles(list){urls.forEach(URL.revokeObjectURL);urls=[];files=[...list
 $('#camera').onchange=()=>$('#camera').files&&setFiles($('#camera').files);$('#library').onchange=()=>$('#library').files&&setFiles($('#library').files);
 function renderQueue(){const q=$('#queue');q.innerHTML='';files.forEach((f,i)=>{const u=URL.createObjectURL(f);urls.push(u);q.insertAdjacentHTML('beforeend',`<div class="item"><img class="thumb" src="${u}"><div><div class="name">写真 ${i+1}</div><div id="st-${i}" class="status">待機中</div><div id="rs-${i}"></div></div></div>`)});$('#scan').disabled=!files.length}
 
+async function loadImageFile(file){const url=URL.createObjectURL(file);return await new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{URL.revokeObjectURL(url);resolve(img)};img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('画像を読み込めませんでした'))};img.src=url})}
 async function imgStats(file){
- const bmp=await createImageBitmap(file),c=document.createElement('canvas'),max=1200,s=Math.min(1,max/bmp.width);c.width=Math.round(bmp.width*s);c.height=Math.round(bmp.height*s);const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(bmp,0,0,c.width,c.height);bmp.close?.();
+ const bmp=await loadImageFile(file),c=document.createElement('canvas'),max=1200,s=Math.min(1,max/bmp.width);c.width=Math.round(bmp.width*s);c.height=Math.round(bmp.height*s);const x=c.getContext('2d',{willReadFrequently:true});x.drawImage(bmp,0,0,c.width,c.height);bmp.close?.();
  const d=x.getImageData(0,0,c.width,c.height).data;let lum=0;for(let i=0;i<d.length;i+=16)lum+=(d[i]*.299+d[i+1]*.587+d[i+2]*.114);lum/=Math.max(1,d.length/16);
  let edge=0,cnt=0;const gray=(xx,yy)=>{const i=(yy*c.width+xx)*4;return d[i]*.299+d[i+1]*.587+d[i+2]*.114};
  for(let yy=2;yy<c.height-2;yy+=6)for(let xx=2;xx<c.width-2;xx+=6){edge+=Math.abs(gray(xx+1,yy)-gray(xx-1,yy))+Math.abs(gray(xx,yy+1)-gray(xx,yy-1));cnt++}
