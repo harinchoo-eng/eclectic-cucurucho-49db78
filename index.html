@@ -246,7 +246,7 @@ function nameCandidates(txt){
 }
 
 async function recognize(file){
- const stat=await imgStats(file);let warning='';
+ let stat;try{stat=await imgStats(file)}catch(e){throw new Error('imgStats: '+(e.message||e))}let warning='';
  if(stat.lum<45)warning='写真がかなり暗めです。ライトを当てるとさらに精度が上がります。';
  else if(stat.edge<10)warning='写真がかなりぼけている可能性があります。';
  const t=await loadOCR();
