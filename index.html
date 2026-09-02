@@ -256,20 +256,20 @@ async function recognize(file){
  // v8.8: ONE PIECEカード番号の印字位置を最優先。カード全面OCRは最後の保険だけにする。
  // 右下・下端・左下を、コントラスト/二値化の両方で細かく走査する。
  const passes=[
-   ocrCrop(stat.canvas,.42,.70,.58,.28,6,'contrast'),
-   ocrCrop(stat.canvas,.55,.74,.45,.22,7,'contrast'),
-   ocrCrop(stat.canvas,.35,.76,.65,.20,7,'threshold'),
-   ocrCrop(stat.canvas,0,.74,1,.22,6,'contrast'),
-   ocrCrop(stat.canvas,0,.80,1,.16,7,'threshold'),
-   ocrCrop(stat.canvas,0,.68,.58,.28,6,'contrast'),
-   ocrCrop(stat.canvas,0,.70,.48,.24,7,'threshold'),
-   ocrCrop(stat.canvas,.18,.62,.82,.34,5,'contrast'),
-   ocrCrop(stat.canvas,.18,.62,.82,.34,5,'threshold')
+   ()=>ocrCrop(stat.canvas,.42,.70,.58,.28,6,'contrast'),
+   ()=>ocrCrop(stat.canvas,.55,.74,.45,.22,7,'contrast'),
+   ()=>ocrCrop(stat.canvas,.35,.76,.65,.20,7,'threshold'),
+   ()=>ocrCrop(stat.canvas,0,.74,1,.22,6,'contrast'),
+   ()=>ocrCrop(stat.canvas,0,.80,1,.16,7,'threshold'),
+   ()=>ocrCrop(stat.canvas,0,.68,.58,.28,6,'contrast'),
+   ()=>ocrCrop(stat.canvas,0,.70,.48,.24,7,'threshold'),
+   ()=>ocrCrop(stat.canvas,.18,.62,.82,.34,5,'contrast'),
+   ()=>ocrCrop(stat.canvas,.18,.62,.82,.34,5,'threshold')
  ];
  let combined='';
- for(const c of passes){
-   const tx=await ocrText(t,c,'eng',codeOpts);
-   combined+='\n'+tx;
+ for(const makeCrop of passes){
+   const c=makeCrop();const tx=await ocrText(t,c,'eng',codeOpts);
+   combined+='\n'+tx;c.width=c.height=1;
    const code=extractCode(tx)||extractCode(combined);
    if(code)return {text:combined,code,warning,nameText:'',names:[]};
  }
