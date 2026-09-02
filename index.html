@@ -441,7 +441,7 @@ $('#enableNotify').onclick=async()=>{
    });
    status.textContent='✅ バックグラウンド価格通知が有効です。サーバーが1時間ごとに確認します。';
    $('#enableNotify').textContent='🔔 バックグラウンド通知ON';
- }catch(e){status.textContent='設定エラー：'+String(e.message||e)}
+ }catch(e){status.textContent='設定エラー：'+String(e.stack||e.message||e)}
 };
 renderTracking(); renderNotifyLog();
 if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js',{scope:'/'}).catch(()=>{})}
@@ -470,7 +470,7 @@ $('#scan').onclick=async()=>{
      rs.innerHTML=`<div class="notice">${rec.warning?rec.warning+'<br>':''}${hint}<br>カード番号を重点的に読み取りましたが特定できませんでした。下の検索欄からカード名でも検索できます。</div>`;
    }
   }
- }catch(e){st.textContent='エラー';st.className='status warn';rs.innerHTML='<div class="notice">'+String(e.message||e)+'</div>'}}
+ }catch(e){st.textContent='エラー';st.className='status warn';rs.innerHTML='<div class="notice">'+String(e.stack||e.message||e)+'</div>'}}
  $('#scan').disabled=false;
 };
 
