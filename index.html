@@ -307,7 +307,7 @@ async function identifyByNames(names){
  }
  return {card:null,candidates:[...seen.values()]};
 }
-async function lookup(q){const r=await fetch('/.netlify/functions/search-card?game='+encodeURIComponent(currentGame)+'&q='+encodeURIComponent(q));const d=await r.json();if(!r.ok)throw new Error(d.error||'検索エラー');return d}
+async function lookup(q){const r=await fetch('https://eclectic-cucurucho-49db78.netlify.app/.netlify/functions/search-card?game='+encodeURIComponent(currentGame)+'&q='+encodeURIComponent(q));const d=await r.json();if(!r.ok)throw new Error(d.error||'検索エラー');return d}
 function mquery(c){return [c.name,c.code,c.variant].filter(Boolean).join(' ')}
 window.marketOpen=(kind,q)=>{
  const e=encodeURIComponent(q), urls={
