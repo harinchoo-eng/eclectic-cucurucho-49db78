@@ -322,7 +322,7 @@ function resultHtml(c){
  const track=trackingKey(c);
  const isTracked=!!getTracking()[track];
  return `<div class="result">
- <div class="name">${c.name||'カード'}</div><div class="code">${[c.code,c.variant].filter(Boolean).join(' ・ ')}</div>
+ <div class="name">${c.name||'カード'}</div><div class="code">${[c.code,c.variant].filter(Boolean).join(' ・ ')}</div> 
  <div class="metrics"><div class="metric"><div class="code">平均買取</div><b>${yen(c.buy_avg)}</b></div><div class="metric"><div class="code">最高買取</div><b>${yen(c.buy_high)}</b></div><div class="metric"><div class="code">販売相場</div><b>${yen(c.sell)}</b></div></div>
  <div class="notice">判定：${c.variant||'種類未確定'}。通常版・パラレルなど複数候補がある場合は、カード全体・右下番号・ホロ加工が見える写真を追加すると精度が上がります。</div>
  <div class="market"><button onclick="marketOpen('yahoo','${esc}')">ヤフオク出品</button><button onclick="marketOpen('yclosed','${esc}')">ヤフオク落札相場</button><button onclick="marketOpen('mercari','${esc}')">メルカリ出品</button><button onclick="marketOpen('flea','${esc}')">Yahoo!フリマ</button></div>
